@@ -25,10 +25,10 @@ class Spacecraft:
     self.orbit = self.orbit.apply_maneuver(man)
 
 #These are the initial r and v for each spacecraft.
-tests = [Spacecraft((-6045, -3490, 2500), (3.457, -6.618, 3.533)), Spacecraft((-5045, -4490, 2500), (-4.457, 5.618, 3.533)), Spacecraft((8000, 0, 0), (0, 8, 0)), Spacecraft((-5045, -4490, 2500), (4.457, -5.618, -3.533)), Spacecraft((-5045, -4490, 2500), (4.457, -5.618, 3.533))]
+tests = [Spacecraft((-6045, -3490, 2500), (3.457, -6.618, 3.533)), Spacecraft((-5045, -4490, 2500), (-4.457, 5.618, 3.533)), Spacecraft((-5045, -4490, 2500), (4.457, -5.618, -3.533)), Spacecraft((-5045, -4490, 2500), (4.457, -5.618, 3.533))]
 #This function generates a fitness score based on the eccentricity, inclination, and number of delta v maneuvers.
 #Each parameter can be weighted according to how important it is.
-def generate_fitness_score(w1,w2,w3,delt_v_size,test_orb,seq):
+def generate_fitness_score(w1,w2,w3,w4,delt_v_size,test_orb,seq):
   num_vs = 0
   for man in seq:
     if man == '1':
@@ -50,7 +50,7 @@ def generate_fitness_score(w1,w2,w3,delt_v_size,test_orb,seq):
       test_orb = test_orb.apply_maneuver(Maneuver.impulse((0,0,-delt_v_size)*u.m/u.s))
       num_vs += 1
     test_orb = test_orb.propagate(20*u.min)
-  return (np.abs(float(test_orb.inc/u.rad - 1.57)))*w1 + float(test_orb.ecc)*w2 + float(num_vs)*w3
+  return np.abs(float(test_orb.inc/u.rad - 1.57))*w1 + float(test_orb.ecc)*w2 + np.abs(float(test_orb.raan/u.rad))*w3 + np.abs(float(test_orb.a/u.km - 15000)/15000)*w4
 
 #This function generates random maneuver strings.
 #They are created in this encoded way for simplicity and efficiency
@@ -65,13 +65,13 @@ def generate_pop(max_delt_v, delt_v_size, pop_size, test_orb, seed = []):
     for i in range(0,max_delt_v):
       seed_chance = np.random.random()
       if len(seed)>0:
-        if seed_chance <= 0.6:
+        if seed_chance <= 0.8:
           seq += seed[i]
         else:
           seq += str(np.random.randint(0,6))
       else:
         seq += str(np.random.randint(0,6))
-    seq_and_fit = (seq, generate_fitness_score(1,1,0.05,delt_v_size,test_orb,seq))
+    seq_and_fit = (seq, generate_fitness_score(0, 1, 1, 0, delt_v_size, test_orb, seq))
     gen_pop.append(seq_and_fit)
   return gen_pop
 
@@ -90,7 +90,7 @@ def mate_seq(fath,moth,delt_v_size,test_orb):
       chil += fath[i]
     else:
       chil += str(np.random.randint(0,6))
-  chil_and_fit = (chil, generate_fitness_score(1,1,0.05,delt_v_size,test_orb,chil))
+  chil_and_fit = (chil, generate_fitness_score(0, 1, 1, 0, delt_v_size, test_orb, chil))
   return chil_and_fit
 
 
@@ -105,7 +105,7 @@ for test in tests:
   population_a = generate_pop(30, 500, 100, test_orb=test.orbit)
   population_b = generate_pop(30, 500, 100, test_orb=test.orbit)
 
-  for g in range(0, 200):
+  for g in range(0, 400):
     population_a.sort(key=operator.itemgetter(1))
     population_b.sort(key=operator.itemgetter(1))
 
@@ -134,7 +134,6 @@ for test in tests:
           for k in range(i, len(sorted_pop_a)):
             population_a.append(mate_seq(sorted_pop_a[i][0], sorted_pop_a[k][0], test_orb=test.orbit, delt_v_size=500))
             population_b.append(mate_seq(sorted_pop_b[i][0], sorted_pop_b[k][0], test_orb=test.orbit, delt_v_size=500))
-
   population_a.sort(key=operator.itemgetter(1))
   population_b.sort(key=operator.itemgetter(1))
   if population_a[0][1] < population_b[0][1]:
